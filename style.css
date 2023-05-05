@@ -1,0 +1,41 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    font-family: Arial, sans-serif;
+    height: 60vh;
+    margin: 0;
+}
+
+.header {
+    text-align: center;
+}
+
+.word {
+    margin: 2rem;
+}
+
+.word__letters {
+    font-size: 1.5rem;
+}
+
+.input {
+    margin-bottom: 1rem;
+    width: 20%;
+    height: 1.5rem;
+}
+
+.new-game {
+    background-color: #007BFF;
+    border: none;
+    border-radius: 5px;
+    color: #ffffff;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    width: 20%;
+}
+
+.new-game:hover {
+    background-color: #0056B3;
+}
