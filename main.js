@@ -8,6 +8,8 @@ const View = (() => {
         wordLetters: ".word__letters",
         inputField: ".input",
         newGameBtn: ".new-game",
+        guessHistoryLetters: ".guess-history__letters",
+        headerTimer: ".header__timer",
     };
 
     const updateWrongGuessCount = (count) => {
@@ -19,10 +21,22 @@ const View = (() => {
         document.querySelector(domSelectors.wordLetters).textContent = spacedWord;
     };
 
+    const updateGuessHistoryDisplay = (correctLetters, incorrectLetters) => {
+        const correctLetterSpans = correctLetters.map(letter => `<span class="correct-letter">${letter}</span>`).join("");
+        const incorrectLetterSpans = incorrectLetters.map(letter => `<span class="incorrect-letter">${letter}</span>`).join("");
+        document.querySelector(domSelectors.guessHistoryLetters).innerHTML = correctLetterSpans + incorrectLetterSpans;
+    };
+
+    const updateTimerDisplay = (timeRemaining) => {
+        document.querySelector(domSelectors.headerTimer).textContent = `Time Left: ${timeRemaining}`;
+    };
+
     return {
         domSelectors,
         updateWrongGuessCount,
         updateWordDisplay,
+        updateGuessHistoryDisplay,
+        updateTimerDisplay
     };
 })();
 
@@ -35,6 +49,8 @@ const Model = ((apiUrl) => {
             this.wrongGuessCount = 0;
             this.correctWordsCount = 0;
             this.hiddenIndexes = new Set();
+            this.correctLetters = new Set();
+            this.incorrectLetters = new Set();
         }
 
         async fetchNewWord() {
@@ -43,13 +59,13 @@ const Model = ((apiUrl) => {
                 const [newWord] = await response.json();
                 this.word = newWord;
                 console.log(this.word);
-                this.randomlyHideLetters();
+                this.hideLetters();
             } catch (error) {
                 console.error("Error fetching new word:", error);
             }
         }
 
-        randomlyHideLetters() {
+        hideLetters() {
             const wordLength = this.word.length;
             const hiddenLetterCount = Math.floor(Math.random() * wordLength) + 1;
             
@@ -65,16 +81,23 @@ const Model = ((apiUrl) => {
         }
 
         guessLetter(letter) {
+            if (this.correctLetters.has(letter) || this.incorrectLetters.has(letter)) {
+                alert("You have already guessed this letter!");
+                return false;
+            }
+
             let isCorrect = false;
             for (const each of this.hiddenIndexes) {
                 if (this.word[each] === letter) {
                     this.hiddenIndexes.delete(each);
                     isCorrect = true;
-                } else {
-                    
-                }
+                } 
             } 
-            if (!isCorrect) {
+
+            if (isCorrect) {
+                this.correctLetters.add(letter);
+            } else {
+                this.incorrectLetters.add(letter);
                 this.wrongGuessCount++;
             }
             this.displayWord = this.word
@@ -91,6 +114,8 @@ const Model = ((apiUrl) => {
             this.wrongGuessCount = 0;
             this.correctWordsCount = 0;
             this.hiddenIndexes = new Set();
+            this.correctLetters = new Set();
+            this.incorrectLetters = new Set();
         }
     }
 
@@ -101,7 +126,7 @@ const Model = ((apiUrl) => {
 
 
 const Controller = ((view, model) => {
-    const { domSelectors, updateWrongGuessCount, updateWordDisplay } = view;
+    const { domSelectors, updateWrongGuessCount, updateWordDisplay, updateGuessHistoryDisplay, updateTimerDisplay } = view;
     const { GameState } = model;
 
     const gameState = new GameState();
@@ -111,27 +136,33 @@ const Controller = ((view, model) => {
         updateWordDisplay(gameState.displayWord);
         updateWrongGuessCount(gameState.wrongGuessCount);
         domSelectors.inputField.value = "";
+        updateGuessHistoryDisplay([...gameState.correctLetters], [...gameState.incorrectLetters]);
     };
 
     const inputGuessLetter = () => {
         document.querySelector(domSelectors.inputField).addEventListener("keydown", async (event) => {
             if (event.key === "Enter") {
-                const letter = event.target.value.trim().toLowerCase();
+                const letter = event.target.value.toLowerCase();
                 if (letter.length === 1 && letter.match(/[a-z]/i)) {
-                    const isCorrect = gameState.guessLetter(letter);
-                    updateWordDisplay(gameState.displayWord);
+                    const isCorrect = gameState.guessLetter(letter); 
                     if (!isCorrect) {
                         updateWrongGuessCount(gameState.wrongGuessCount);
                     }
-
+                    updateWordDisplay(gameState.displayWord);
+                    updateGuessHistoryDisplay([...gameState.correctLetters], [...gameState.incorrectLetters]);
+                    
                     if (gameState.wrongGuessCount > MAX_WRONG_GUESSES) {
-                        alert(`Game over! You have guessed ${gameState.correctWordsCount} words!`);
                         gameState.reset();
                         await init();
+                        startTimer();
+                        alert(`Game over! You have guessed ${gameState.correctWordsCount} words!`);
                     } else if (!gameState.displayWord.includes("_")) {
                         gameState.correctWordsCount++;
+                        gameState.correctLetters.clear();
+                        gameState.incorrectLetters.clear();
                         await gameState.fetchNewWord();
                         updateWordDisplay(gameState.displayWord);
+                        updateGuessHistoryDisplay([...gameState.correctLetters], [...gameState.incorrectLetters]);
                     }
                 }
                 event.target.value = "";
@@ -140,24 +171,48 @@ const Controller = ((view, model) => {
     };
     
     const newGamehandler = async () => {
-        
         document.querySelector(domSelectors.newGameBtn).addEventListener("click", async () => {
             document.querySelector(domSelectors.inputField).value = "";
             gameState.reset();
             await init();  
+            startTimer();
         });
+    }
+
+    let timer;
+    const startTimer = () => {
+        if (timer) {
+            clearInterval(timer);
+        }
+
+        let timeRemaining = 60;
+        updateTimerDisplay(timeRemaining);
+        
+        timer = setInterval(async () => {
+            timeRemaining--;
+            updateTimerDisplay(timeRemaining);
+
+            if (timeRemaining <= 0) {
+                gameState.reset();
+                await init();
+                startTimer();
+                alert(`Time's used up! You have guessed ${gameState.correctWordsCount} words!`);
+            }
+        }, 1000);
     }
 
     const bootstrap = () => {
         init();
         inputGuessLetter();
         newGamehandler();
+        startTimer();
     };
     
     return {
         bootstrap,
     };
 })(View, Model);
+
 
 Controller.bootstrap();
     
